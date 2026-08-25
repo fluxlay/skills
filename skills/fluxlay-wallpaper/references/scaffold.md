@@ -28,6 +28,9 @@ From the description, propose a concrete plan and present it to the user. Cover:
    - `directory` — same as `slug` by default; let the user override
 3. **For `kind: web` only**, list the SDK surface and constraints up front:
    - SDK hooks you plan to use (e.g. `useSystemMonitor`, `useMousePosition`, `useAudio`)
+   - Whether the wallpaper needs **clickable / focusable UI** (buttons, inputs, drag). If so it must be wrapped in
+     `MimoProvider` from `@fluxlay/react/mimo` — wallpapers are click-through and plain DOM events never fire
+     (SKILL.md §3)
    - Required `permissions:` entries (`keyboard`, `ime-input`)
    - Required `network:` entries (any external host the wallpaper will fetch from)
    - CSP / pitfall flags relevant to the idea (external fetch, `eval`-based libs, mouse Y inversion, etc. — see SKILL.md §4 and §8)

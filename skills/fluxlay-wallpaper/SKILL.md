@@ -114,6 +114,7 @@ Sections 3–5 (SDK, CSP, platform requirements) only apply to `kind: web`. For 
 ### Input
 - `useMousePosition(): {x, y}` — normalized to `[-1, 1]`. **Y is mathematical convention** (positive = up), opposite of CSS where Y grows downward.
 - `useMouseEvents({ onButton?, onWheel? })` — clicks and wheel. Same `[-1, 1]` Y-up coordinates as `useMousePosition`.
+- `normalizedToPixel(nx, ny)` / `pixelToNormalized(x, y)` — convert between the `[-1, 1]` Y-up space above and CSS pixels in the current window. **Use these instead of hand-rolling the flip.**
 - `useKeyboard({ onKeyDown?, onKeyUp? })` — global keystrokes from any window. Requires `permissions: [keyboard]`. `event.code` follows Web `KeyboardEvent.code` (`"KeyA"`, `"Space"`, etc., layout-independent).
 - `useImeInput()` — IME-composed text. Requires `permissions: [ime-input]`. Returns `{ composition: string | null, cursor: number, activate(), deactivate(), onCommit(handler): cleanup }`. Auto-`deactivate` on unmount; while active, `useKeyboard` is paused on the same wallpaper to avoid double-firing IME candidate keys. Without the permission the hook is a no-op + one `console.warn` (no exception). **Note**: any `<input>` / `<textarea>` / `contenteditable` in a wallpaper transparently gets IME via a global handler registered at SDK import time — `useImeInput` is only needed for fully custom UIs.
 
@@ -127,11 +128,35 @@ Sections 3–5 (SDK, CSP, platform requirements) only apply to `kind: web`. For 
 - `useSystemMonitor(options?)` — returns CPU usage / per-core / frequency, memory + swap, network rx/tx, disk io, disk capacity per mount, battery level + charging, process count, load average. Options (all `*IntervalMs`, with defaults): `cpu` 500, `memory` 1000, `network` 1000, `diskIo` 2000, `diskSpace` 30000, `battery` 10000, `process` 10000, `loadAverage` 5000.
 - `useAudio({ numBands? = 32 })` — `{ rms, peak, spectrum: number[] }`, all `[0, 1]`. Spectrum is A-weighted (IEC 61672) so frequency balance matches human hearing. macOS only requires audio capture permission (see §5).
 - `useMediaMetadata({ intervalMs? = 1000 })` — `{ title, artist, album, artwork, duration, elapsedTime, playbackRate, isPlaying }`. `artwork` is a `data:image/...;base64,...` URL.
-- `useShell(commandId, { refreshInterval? = 30000, terminal?, ... })` — runs a command declared under `shell:`. `refreshInterval: 0` disables auto-refresh. Can render output into an xterm terminal via `terminal:` option.
-- `useTerminal(options?)` — xterm.js-backed terminal (`@xterm/xterm`). Returns `{ terminalRef, instance }`. `TerminalThemes` provides 13 built-in color themes.
+- `useShell(commandId, { refreshInterval? = 30000, showStdout? = true, showStderr? = false, terminal? })` — runs a command declared under `shell:`. `refreshInterval: 0` disables auto-refresh. Can render output into an xterm terminal via `terminal:` option.
+- `useTerminal(options?)` — xterm.js-backed terminal (`@xterm/xterm`). Returns `{ terminalRef, instance }`. `TerminalThemes` provides 20 built-in color themes in a **nested** collection — some keys are a theme, others a group of variants: `TerminalThemes.nord` / `.dracula` / `.oneDark` / `.monokaiPro` / `.tokyoNight` / `.nightOwl` are themes; `TerminalThemes.dark.default | .modern`, `.light.default | .modern`, `.gruvbox.dark | .light`, `.solarized.dark | .light`, `.everforest.dark | .light`, `.catppuccin.latte | .frappe | .macchiato | .mocha` are groups.
+
+### Interactive DOM UI (`@fluxlay/react/mimo`)
+
+Wallpaper windows are **click-through**: the OS delivers cursor and key events to whatever is in front, so they never reach the webview as real DOM events. `onClick`, `onPointerDown`, `<input>` focus, drag-and-drop libraries — **none of it fires on its own**, no matter how the markup is written.
+
+`MimoProvider` bridges that gap. It subscribes to the OS input hooks above and dispatches the corresponding **synthetic** DOM events onto the right elements (with hit-testing, pointer capture, and shadow-DOM piercing), so ordinary React handlers work as if a real user were operating the page.
+
+```tsx
+import { MimoProvider } from "@fluxlay/react/mimo";
+
+createRoot(el).render(
+  <MimoProvider>
+    <button onClick={() => ...}>works</button>
+  </MimoProvider>
+);
+```
+
+- Nothing extra to install — `@fluxlay/react/mimo` is a subpath export of `@fluxlay/react` and the mimo runtime is bundled into it.
+- Props: `pointer?` (default `true`) and `keyboard?` (default `true`) — set `false` to temporarily detach one input.
+- Keyboard forwarding goes through `useKeyboard`, so it needs `permissions: [keyboard]`.
+- Also exported: `useMimoForwarder()` (imperative `injectPointer` / `injectKeyboard`), and `MimoForwarderProvider` — the lower-level provider for a non-fluxlay input source (tests, replay).
+- **Reach for this before hand-rolling `useMouseEvents` + manual hit-testing.** Writing your own coordinate math and element lookup is the usual failure mode for interactive wallpapers.
+
+Docs: https://fluxlay.com/docs/developer/reference/sdk/mimo-provider · example: `mimo-showcase` in the examples repo.
 
 ### Network & host integration (imperative APIs)
-- `proxiedFetch(input, init?): Promise<Response>` — fetch routed through the host process to bypass CORS for declared `network:` origins. Constraints: only `http` / `https`; max **10 MiB** response body; request strips `Cookie` / `Origin` / `Host` / `Referer`; only `Content-Type` / `Cache-Control` / `ETag` / `Last-Modified` are forwarded back. Use this for hosts that don't return `Access-Control-Allow-Origin` (e.g. ICS feeds).
+- `proxiedFetch(input, init?): Promise<Response>` — fetch routed through the host process to bypass CORS for declared `network:` origins. Constraints: only `http` / `https`; max **10 MiB** response body; request strips `Cookie` / `Origin` / `Host` / `Referer`; only `Content-Type` / `Cache-Control` / `ETag` / `Last-Modified` are forwarded back; streaming bodies are not supported (the upstream body is fully buffered before it returns). Use this for hosts that don't return `Access-Control-Allow-Origin` (e.g. ICS feeds).
 - `runShell(commandId, options?): Promise<{ stdout, stderr, exitCode }>` — imperative twin of `useShell`. Same `shell:` declaration required.
 - `openUrl(url): Promise<void>` — opens an external URL in the user's default browser (the **only** sanctioned way to navigate out of a wallpaper — `<a target="_blank">` won't work).
 - `notify({ title, body, ... }): Promise<void>` — fires an OS notification.
@@ -178,6 +203,7 @@ Practical implications:
 | `fluxlay whoami` | Show current user. |
 | `fluxlay dev [dir]` | Vite dev server with HMR. Writes `dev.json` to the app data dir; the desktop app reads it and renders the wallpaper from the dev URL. |
 | `fluxlay build [dir] [-o name.fluxlay]` | Produce an encrypted `.fluxlay` package (default output `wallpaper.fluxlay`). |
+| `fluxlay rebuild [dir] [-o name.fluxlay]` | Re-pack an existing preview asset into the current FLX3 format. Rarely needed when authoring. |
 | `fluxlay publish [dir]` | Build and upload to the Fluxlay store. No `kind` override flag. |
 
 **Both `build` and `publish` require a logged-in session** (the developer key is fetched from the API). Only `dev` works offline. `build` and `publish` require a `kind` field in `fluxlay.yaml`.
@@ -210,7 +236,8 @@ On Claude Code with the Fluxlay plugin installed, a `PreToolUse` hook runs the s
 
 - [ ] Calling an external API without declaring its host in `network:` → blocked by CSP in production.
 - [ ] Declaring `network:` origin with a path/query/wildcard/trailing slash → manifest invalid.
-- [ ] Using mouse Y as CSS Y → flipped image. Convert with `(1 - (y + 1) / 2) * height`.
+- [ ] Using mouse Y as CSS Y → flipped image. Convert with `normalizedToPixel(x, y)` rather than hand-rolling the flip.
+- [ ] Expecting `onClick` / `onPointerDown` / drag libraries to fire without wrapping the tree in `MimoProvider` → wallpapers are click-through, so no real DOM events ever arrive. See §3.
 - [ ] Adding `useKeyboard` without `permissions: [keyboard]` → backend returns HTTP 403, no events fire.
 - [ ] Using `eval`-based libraries / runtime template engines → works in dev, breaks after build/publish.
 - [ ] Using `<a target="_blank">` or `window.open(url)` for an external URL → silently fails. Use `openUrl(url)`.
@@ -227,6 +254,7 @@ On Claude Code with the Fluxlay plugin installed, a `PreToolUse` hook runs the s
 
 - Docs: https://fluxlay.com/docs/developer/tutorials/getting-started
 - SDK reference: https://fluxlay.com/docs/developer/reference/sdk/use-mouse-position
+- MimoProvider (interactive DOM UI): https://fluxlay.com/docs/developer/reference/sdk/mimo-provider
 - CLI reference: https://fluxlay.com/docs/developer/reference/cli/commands
 - Manifest reference: https://fluxlay.com/docs/developer/reference/cli/manifest
 - Examples: https://github.com/fluxlay/examples
