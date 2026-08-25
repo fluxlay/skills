@@ -1,29 +1,46 @@
-# Fluxlay Claude Code Plugin
+# Fluxlay Agent Skills
 
-A Claude Code plugin for building [Fluxlay](https://fluxlay.com) wallpapers — scaffold a project in one command, then let Claude write the wallpaper for you with full knowledge of the SDK and runtime constraints.
+[![skills.sh](https://skills.sh/b/fluxlay/skills)](https://skills.sh/fluxlay/skills)
 
-## What's included
+Agent skills and a Claude Code plugin for building [Fluxlay](https://fluxlay.com) wallpapers — scaffold a project
+from an idea, then let your coding agent write the wallpaper with full knowledge of the SDK and runtime constraints.
 
-- **Skill: `fluxlay-wallpaper`** — Domain knowledge about the `@fluxlay/react` SDK hooks, `fluxlay.yaml` manifest, runtime CSP constraints, and common pitfalls. Claude pulls this in automatically when you work on a Fluxlay wallpaper.
-- **Slash command: `/fluxlay:new`** — Scaffold a new wallpaper project (`web` / `video` / `image`) from a minimal template, install dependencies, and initialize git.
-- **Guardrail hooks**:
-  - `PostToolUse` — every time Claude edits `fluxlay.yaml`, the manifest is shallow-validated (slug format, SemVer, `kind` enum, media `source` extension). Errors are surfaced back so Claude can fix them in the same turn.
-  - `PreToolUse` — when a publish command (`fluxlay publish`, `npm run publish`, etc.) is about to run inside a wallpaper project, a pre-flight check verifies the manifest, build freshness (`web` kind), and `fluxlay whoami` login state. Hard failures deny the action; otherwise the user gets a confirmation prompt with a summary.
+## Install
 
-For `dev` / `build` / `publish` you can simply ask Claude in natural language ("start the dev server", "build and check it", "publish it") — the bundled skill knows the right `@fluxlay/cli` commands and the pre-flight checks to run.
+### Any agent — `npx skills`
 
-## Installation
+Works with Claude Code, Codex, Cursor, OpenCode, Gemini CLI, Copilot, and [70+ other agents](https://github.com/vercel-labs/skills#supported-agents).
 
-In Claude Code:
+```sh
+npx skills add fluxlay/skills            # this project only
+npx skills add fluxlay/skills -g         # every project
+```
+
+### Claude Code — full plugin
+
+The plugin adds a slash command and guardrail hooks on top of the skill.
 
 ```text
-/plugin marketplace add fluxlay/claude-plugin
+/plugin marketplace add fluxlay/skills
 /plugin install fluxlay@fluxlay
 ```
 
+Pick this one if you're on Claude Code; pick `npx skills` for everything else.
+
+## What's included
+
+| | `npx skills` | Claude Code plugin |
+|---|---|---|
+| **Skill: `fluxlay-wallpaper`** — `@fluxlay/react` SDK hooks, `fluxlay.yaml` manifest schema, runtime CSP constraints, `@fluxlay/cli` workflow, and common pitfalls. Pulled in automatically when you work on a wallpaper. | ✅ | ✅ |
+| **Scaffolding flow** — discovery (kind / naming / permissions / network) → copy template → implement. Bundled as `references/scaffold.md` + `templates/`. | ✅ (ask "create a new Fluxlay wallpaper") | ✅ (`/fluxlay:new`) |
+| **`PostToolUse` hook** — shallow-validates `fluxlay.yaml` on every edit (slug format, `kind` enum, media `source` extension) and surfaces errors back so the agent fixes them in the same turn. | — | ✅ |
+| **`PreToolUse` hook** — pre-flight check before `fluxlay publish` (manifest, build freshness, `fluxlay whoami`). Hard failures deny the action; otherwise you get a confirmation prompt. | — | ✅ |
+
+For `dev` / `build` / `publish` just ask in natural language ("start the dev server", "build and check it",
+"publish it") — the skill knows the right `@fluxlay/cli` commands and the pre-flight checks to run.
+
 ## Requirements
 
-- [Claude Code](https://claude.com/claude-code)
 - [Fluxlay desktop app](https://fluxlay.com/download) — for previewing wallpapers
 - Node.js 20+ (any package manager: npm / pnpm / yarn / bun)
 - A `fluxlay login` session (only needed when publishing)
@@ -31,14 +48,34 @@ In Claude Code:
 ## Usage
 
 ```text
-/fluxlay:new                       # scaffold a new wallpaper project
+/fluxlay:new                       # Claude Code
 ```
 
-Then describe what you want and let Claude build it. Examples:
+On other agents, just say what you want:
+
+> Create a new Fluxlay wallpaper: a breathing circle whose color tracks CPU usage.
+
+Then keep going in natural language:
 
 > Add a CPU-usage bar that pulses in red when load goes above 80%.
 
 > Make the background react to system audio with a frequency-spectrum visualizer.
+
+## Repository layout
+
+```text
+skills/fluxlay-wallpaper/
+  SKILL.md                 # the skill — SDK, manifest, CSP, CLI, pitfalls
+  references/scaffold.md   # new-project flow (agent-agnostic)
+  templates/web-react/     # kind: web starter (Vite + React)
+  templates/media/         # kind: video / image starter
+commands/new.md            # /fluxlay:new — thin wrapper over references/scaffold.md
+hooks/                     # Claude Code guardrail hooks
+.claude-plugin/            # Claude Code plugin + marketplace manifests
+```
+
+`skills/` is the single source of truth. The Claude Code plugin layers hooks and a slash command on top of it —
+it does not fork the content.
 
 ## License
 

@@ -8,7 +8,7 @@
     "url": "https://fluxlay.com"
   },
   "homepage": "https://fluxlay.com",
-  "repository": "https://github.com/fluxlay/claude-plugin",
+  "repository": "https://github.com/fluxlay/skills",
   "license": "MIT",
   "keywords": ["fluxlay", "wallpaper", "react", "creator-tools"]
 }

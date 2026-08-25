@@ -1,10 +1,17 @@
 ---
+name: fluxlay-wallpaper
 description: Fluxlay wallpaper development support. Provides @fluxlay/react SDK hooks, fluxlay.yaml manifest schema, runtime CSP constraints, @fluxlay/cli workflow, and common pitfalls. Reference this when the user asks to create, edit, or debug a Fluxlay wallpaper.
 ---
 
 # Fluxlay Wallpaper Skill
 
 Knowledge base for building [Fluxlay](https://fluxlay.com) wallpapers. Use this whenever the user is creating, editing, or debugging a wallpaper project.
+
+Bundled with this skill:
+
+- `references/scaffold.md` — step-by-step flow for starting a **new** wallpaper from an idea. Read it when the user wants to create one.
+- `templates/web-react/` — minimal `kind: web` project (Vite + React).
+- `templates/media/` — minimal `kind: video` / `kind: image` project.
 
 ## 1. Minimum project layout
 
@@ -30,7 +37,7 @@ Project root contains only:
 
 No Vite, no Node deps. CLI packages the file as `media.<ext>` directly. The desktop app generates a player HTML at delivery time.
 
-For a brand-new project, run `/fluxlay:new` to scaffold the minimum template (it asks which kind).
+For a brand-new project, follow [`references/scaffold.md`](references/scaffold.md) — it walks discovery (kind / naming / permissions / network) then copies the matching template from `templates/`. On Claude Code with the Fluxlay plugin installed, `/fluxlay:new` runs the same flow.
 
 ## 2. `fluxlay.yaml` manifest
 
@@ -189,7 +196,7 @@ Before running the `publish` script, confirm with the user:
 - `kind` is final (changing it is a breaking change for existing users).
 - `fluxlay whoami` succeeds.
 
-The plugin also installs a `PreToolUse` hook that runs the same checks automatically when a `publish` command is detected, and asks the user to confirm. Treat the hook as a safety net — still walk through the checklist proactively.
+On Claude Code with the Fluxlay plugin installed, a `PreToolUse` hook runs the same checks automatically when a `publish` command is detected and asks the user to confirm. Treat the hook as a safety net — walk through the checklist proactively either way, since it does not exist when this skill is installed standalone via `npx skills`.
 
 ## 7. Recommended implementation flow
 
